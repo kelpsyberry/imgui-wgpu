@@ -24,8 +24,8 @@ fn vs_main(
     return output;
 }
 
-@group(1) @binding(0) var t_texture: texture_2d<f32>;
-@group(1) @binding(1) var s_texture: sampler;
+@group(1) @binding(0) var<uniform> t_texture: texture_2d<f32>;
+@group(1) @binding(1) var<uniform> s_texture: sampler;
 
 @fragment
 fn fs_main(
