@@ -3,8 +3,8 @@ use imgui::internal::RawWrapper;
 use std::{
     borrow::Cow,
     cell::{Cell, Ref, RefCell, RefMut},
-    mem::{replace, size_of},
-    num::{NonZeroU32, NonZeroU64, NonZeroU8},
+    mem::{replace, size_of, size_of_val},
+    num::NonZeroU64,
     slice,
 };
 
@@ -30,14 +30,14 @@ impl TextureDescriptor {
             dimension: wgpu::TextureDimension::D2,
             format: self.format,
             usage: self.usage,
+            view_formats: &[],
         }
     }
 
-    fn bytes_per_row(&self) -> Option<NonZeroU32> {
-        let format_info = self.format.describe();
-        NonZeroU32::new(
-            self.width / format_info.block_dimensions.0 as u32 * format_info.block_size as u32,
-        )
+    fn bytes_per_row(&self) -> Option<u32> {
+        let block_dimensions = self.format.block_dimensions();
+        let block_size = self.format.block_copy_size(None)?;
+        Some(self.width / block_dimensions.0 * block_size)
     }
 }
 
@@ -61,7 +61,7 @@ pub struct SamplerDescriptor {
     pub mipmap_filter: wgpu::FilterMode,
     pub lod_min_clamp: f32,
     pub lod_max_clamp: f32,
-    pub anisotropy_clamp: Option<NonZeroU8>,
+    pub anisotropy_clamp: u16,
     pub border_color: Option<wgpu::SamplerBorderColor>,
 }
 
@@ -93,7 +93,7 @@ impl Default for SamplerDescriptor {
             mipmap_filter: Default::default(),
             lod_min_clamp: 0.0,
             lod_max_clamp: std::f32::MAX,
-            anisotropy_clamp: None,
+            anisotropy_clamp: 1,
             border_color: None,
         }
     }
@@ -112,7 +112,7 @@ pub struct TextureSetRange {
 pub struct OwnedTexture {
     label: Option<Cow<'static, str>>,
     texture_desc: TextureDescriptor,
-    texture_bytes_per_row: Option<NonZeroU32>,
+    texture_bytes_per_row: Option<u32>,
     texture_data: RefCell<Option<(wgpu::Texture, wgpu::TextureView)>>,
     sampler_desc: SamplerDescriptor,
     sampler: RefCell<Option<wgpu::Sampler>>,
@@ -169,7 +169,7 @@ impl OwnedTexture {
         *self.bind_group.get_mut() = None;
     }
 
-    pub fn texture_bytes_per_row(&mut self) -> Option<NonZeroU32> {
+    pub fn texture_bytes_per_row(&mut self) -> Option<u32> {
         self.texture_bytes_per_row
     }
 
@@ -322,6 +322,7 @@ impl TextureView {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum Texture {
     Owned(OwnedTexture),
     View(TextureView),
@@ -681,10 +682,12 @@ impl Renderer {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
-                    store: true,
+                    store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
 
         if draw_data.total_vtx_count == 0 || draw_data.total_idx_count == 0 {
@@ -736,11 +739,11 @@ impl Renderer {
             unsafe {
                 vtx.extend_from_slice(slice::from_raw_parts(
                     vtx_buffer.as_ptr() as *const u8,
-                    vtx_buffer.len() * size_of::<imgui::DrawVert>(),
+                    size_of_val(vtx_buffer),
                 ));
                 idx.extend_from_slice(slice::from_raw_parts(
                     idx_buffer.as_ptr() as *const u8,
-                    idx_buffer.len() * size_of::<imgui::DrawIdx>(),
+                    size_of_val(idx_buffer),
                 ));
             }
         }
@@ -812,8 +815,8 @@ impl Renderer {
                         }
 
                         let scissor_size = [
-                            (clip_rect[2] - clip_rect[0]).abs().ceil() as u32,
-                            (clip_rect[3] - clip_rect[1]).abs().ceil() as u32,
+                            (clip_rect[2] - clip_rect[0]).abs().min(fb_width).ceil() as u32,
+                            (clip_rect[3] - clip_rect[1]).abs().min(fb_height).ceil() as u32,
                         ];
 
                         if scissor_size[0] == 0 || scissor_size[1] == 0 {

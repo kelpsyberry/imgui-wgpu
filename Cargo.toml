@@ -5,6 +5,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-wgpu = { version = "0.14" }
-imgui = { git = "https://github.com/imgui-rs/imgui-rs" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu" }
+imgui = "0.11"
 ahash = "0.8"
