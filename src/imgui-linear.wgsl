@@ -32,5 +32,9 @@ fn fs_main(
     @location(0) uv: vec2<f32>,
     @location(1) vert_color: vec4<f32>,
 ) -> @location(0) vec4<f32> {
-    return vert_color * textureSample(t_texture, s_texture, uv);
+    var tex_color: vec4<f32> = textureSample(t_texture, s_texture, uv);
+    return vec4<f32>(
+        vert_color.rgb * pow(tex_color.rgb, vec3<f32>(1.0 / 2.2)),
+        vert_color.a * tex_color.a
+    );
 }

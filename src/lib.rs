@@ -381,6 +381,14 @@ impl Texture {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SrgbMode {
+    None,
+    Linear,
+    // TODO: Alpha blending is actually still very broken like this
+    Srgb,
+}
+
 pub struct Renderer {
     view_buffer: wgpu::Buffer,
     view_bind_group: wgpu::BindGroup,
@@ -394,6 +402,7 @@ pub struct Renderer {
     pipeline: wgpu::RenderPipeline,
     textures: RefCell<HashMap<imgui::TextureId, Texture>>,
     next_texture_id: Cell<usize>,
+    srgb_mode: SrgbMode,
 }
 
 impl Renderer {
@@ -402,6 +411,7 @@ impl Renderer {
         layout: &wgpu::PipelineLayout,
         shader_module: &wgpu::ShaderModule,
         output_format: wgpu::TextureFormat,
+        srgb_mode: SrgbMode,
     ) -> wgpu::RenderPipeline {
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("ImGui"),
@@ -449,7 +459,11 @@ impl Renderer {
                     format: output_format,
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
+                            src_factor: if srgb_mode == SrgbMode::Srgb {
+                                wgpu::BlendFactor::One
+                            } else {
+                                wgpu::BlendFactor::SrcAlpha
+                            },
                             dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
                             operation: wgpu::BlendOperation::Add,
                         },
@@ -468,6 +482,7 @@ impl Renderer {
         queue: &wgpu::Queue,
         imgui: &mut imgui::Context,
         output_format: wgpu::TextureFormat,
+        srgb_mode: SrgbMode,
     ) -> Self {
         imgui
             .io_mut()
@@ -535,10 +550,22 @@ impl Renderer {
         });
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("ImGui"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("imgui.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                match srgb_mode {
+                    SrgbMode::None => include_str!("imgui.wgsl"),
+                    SrgbMode::Linear => include_str!("imgui-linear.wgsl"),
+                    SrgbMode::Srgb => include_str!("imgui-srgb.wgsl"),
+                }
+                .into(),
+            ),
         });
-        let pipeline =
-            Self::rebuild_pipeline(device, &pipeline_layout, &shader_module, output_format);
+        let pipeline = Self::rebuild_pipeline(
+            device,
+            &pipeline_layout,
+            &shader_module,
+            output_format,
+            srgb_mode,
+        );
 
         let mut renderer = Renderer {
             view_buffer,
@@ -553,6 +580,7 @@ impl Renderer {
             vtx_buffer_capacity: 0,
             idx_buffer: None,
             idx_buffer_capacity: 0,
+            srgb_mode,
         };
 
         renderer.reload_fonts(device, queue, imgui);
@@ -562,8 +590,13 @@ impl Renderer {
 
     #[inline]
     pub fn change_swapchain_format(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
-        self.pipeline =
-            Self::rebuild_pipeline(device, &self.pipeline_layout, &self.shader_module, format);
+        self.pipeline = Self::rebuild_pipeline(
+            device,
+            &self.pipeline_layout,
+            &self.shader_module,
+            format,
+            self.srgb_mode,
+        );
     }
 
     #[inline]
