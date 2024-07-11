@@ -440,6 +440,7 @@ impl Renderer {
                         },
                     ],
                 }],
+                compilation_options: Default::default(),
             },
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -471,6 +472,7 @@ impl Renderer {
                     }),
                     write_mask: wgpu::ColorWrites::all(),
                 })],
+                compilation_options: Default::default(),
             }),
             multiview: None,
         })
