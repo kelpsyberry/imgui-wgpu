@@ -468,7 +468,15 @@ impl Renderer {
                             dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
                             operation: wgpu::BlendOperation::Add,
                         },
-                        alpha: wgpu::BlendComponent::REPLACE,
+                        alpha: if srgb_mode == SrgbMode::Srgb {
+                            wgpu::BlendComponent::REPLACE
+                        } else {
+                            wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::One,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            }
+                        },
                     }),
                     write_mask: wgpu::ColorWrites::all(),
                 })],
