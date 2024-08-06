@@ -5,6 +5,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-wgpu = "0.20"
+wgpu = "22.0"
 imgui = "0.12"
 ahash = "0.8"
