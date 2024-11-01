@@ -418,7 +418,7 @@ impl Renderer {
             layout: Some(layout),
             vertex: wgpu::VertexState {
                 module: shader_module,
-                entry_point: "vs_main",
+                entry_point: None,
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: 20,
                     step_mode: wgpu::VertexStepMode::Vertex,
@@ -455,7 +455,7 @@ impl Renderer {
             multisample: wgpu::MultisampleState::default(),
             fragment: Some(wgpu::FragmentState {
                 module: shader_module,
-                entry_point: "fs_main",
+                entry_point: None,
                 targets: &[Some(wgpu::ColorTargetState {
                     format: output_format,
                     blend: Some(wgpu::BlendState {
